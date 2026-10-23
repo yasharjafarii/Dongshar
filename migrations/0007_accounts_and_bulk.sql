@@ -1,0 +1,18 @@
+ALTER TABLE users ADD COLUMN email_verified_at INTEGER;
+CREATE TABLE email_tokens(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),purpose TEXT NOT NULL,password_marker TEXT NOT NULL,expires INTEGER NOT NULL,used TEXT);
+CREATE INDEX email_tokens_user ON email_tokens(user_id,purpose);
+CREATE TABLE ledger_revision(id INTEGER PRIMARY KEY CHECK(id=1),value INTEGER NOT NULL);
+INSERT INTO ledger_revision VALUES(1,0);
+CREATE TRIGGER revision_personal_insert AFTER INSERT ON personal_entries BEGIN UPDATE ledger_revision SET value=value+1; END;
+CREATE TRIGGER revision_personal_update AFTER UPDATE ON personal_entries BEGIN UPDATE ledger_revision SET value=value+1; END;
+CREATE TRIGGER revision_expense_insert AFTER INSERT ON expenses BEGIN UPDATE ledger_revision SET value=value+1; END;
+CREATE TRIGGER revision_expense_update AFTER UPDATE ON expenses BEGIN UPDATE ledger_revision SET value=value+1; END;
+CREATE TRIGGER revision_payment_insert AFTER INSERT ON settlements BEGIN UPDATE ledger_revision SET value=value+1; END;
+CREATE TRIGGER revision_payment_update AFTER UPDATE ON settlements BEGIN UPDATE ledger_revision SET value=value+1; END;
+CREATE TRIGGER revision_account_update AFTER UPDATE ON personal_accounts BEGIN UPDATE ledger_revision SET value=value+1; END;
+CREATE TRIGGER revision_participant_update AFTER UPDATE ON group_participants BEGIN UPDATE ledger_revision SET value=value+1; END;
+CREATE TRIGGER revision_member_delete AFTER DELETE ON members BEGIN UPDATE ledger_revision SET value=value+1; END;
+CREATE TABLE settlement_batches(id TEXT PRIMARY KEY,owner TEXT NOT NULL REFERENCES users(id),person TEXT NOT NULL,guard INTEGER NOT NULL CHECK(guard=1),reversed INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE batch_payments(payment_id TEXT PRIMARY KEY,batch_id TEXT NOT NULL REFERENCES settlement_batches(id),scope TEXT NOT NULL);
+CREATE TABLE bulk_item_closures(item_key TEXT PRIMARY KEY,batch_id TEXT NOT NULL REFERENCES settlement_batches(id),scope TEXT NOT NULL,source_id TEXT NOT NULL);
+CREATE INDEX bulk_source ON bulk_item_closures(scope,source_id);

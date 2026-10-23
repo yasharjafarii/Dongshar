@@ -1,0 +1,18 @@
+PRAGMA foreign_keys = ON;
+CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL, salt TEXT NOT NULL, recovery TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE sessions (token TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires INTEGER NOT NULL);
+CREATE INDEX sessions_expiry ON sessions(expires);
+CREATE TABLE auth_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL);
+CREATE TABLE groups (id TEXT PRIMARY KEY, name TEXT NOT NULL, emoji TEXT NOT NULL DEFAULT '✈️', currency TEXT NOT NULL DEFAULT 'IRT', owner TEXT NOT NULL REFERENCES users(id), invite TEXT NOT NULL UNIQUE, archived INTEGER NOT NULL DEFAULT 0, defaults TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE members (group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id), PRIMARY KEY(group_id,user_id));
+CREATE INDEX members_user ON members(user_id);
+CREATE TABLE expenses (id TEXT PRIMARY KEY, group_id TEXT NOT NULL REFERENCES groups(id), creator TEXT NOT NULL REFERENCES users(id), title TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount>0), currency TEXT NOT NULL, date TEXT NOT NULL, category TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', mode TEXT NOT NULL, allocations TEXT NOT NULL, payers TEXT NOT NULL, receipt TEXT, version INTEGER NOT NULL DEFAULT 1, deleted INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX expenses_group ON expenses(group_id,deleted,date);
+CREATE TABLE settlements (id TEXT PRIMARY KEY, group_id TEXT NOT NULL REFERENCES groups(id), sender TEXT NOT NULL REFERENCES users(id), receiver TEXT NOT NULL REFERENCES users(id), amount INTEGER NOT NULL CHECK(amount>0), currency TEXT NOT NULL, date TEXT NOT NULL, creator TEXT NOT NULL REFERENCES users(id), deleted INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX settlements_group ON settlements(group_id,deleted);
+CREATE TABLE comments (id TEXT PRIMARY KEY, expense_id TEXT NOT NULL REFERENCES expenses(id), user_id TEXT NOT NULL REFERENCES users(id), body TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX comments_expense ON comments(expense_id);
+CREATE TABLE activity (id TEXT PRIMARY KEY, group_id TEXT NOT NULL REFERENCES groups(id), user_id TEXT NOT NULL REFERENCES users(id), message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX activity_group ON activity(group_id,created_at);
+CREATE TABLE recurring (id TEXT PRIMARY KEY, group_id TEXT NOT NULL REFERENCES groups(id), creator TEXT NOT NULL REFERENCES users(id), template TEXT NOT NULL, cadence TEXT NOT NULL, next_date TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1);
+CREATE INDEX recurring_due ON recurring(active,next_date);

@@ -1,0 +1,1 @@
+ALTER TABLE group_participants ADD COLUMN removed INTEGER NOT NULL DEFAULT 0;
