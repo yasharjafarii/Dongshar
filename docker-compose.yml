@@ -1,0 +1,27 @@
+# Coolify: create a "Docker Compose" application from this repository.
+# Base Directory: /   Docker Compose Location: /docker-compose.yml
+services:
+  dongshar:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      # Public address used in password-reset and verification emails.
+      APP_URL: ${APP_URL}
+      # Optional Resend API key; without it email sending stays disabled.
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: ${EMAIL_FROM}
+    volumes:
+      - dong-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  dong-data:

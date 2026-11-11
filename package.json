@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "start": "node server/server.mjs",
     "deploy": "node scripts/deploy.mjs",
     "db:local": "wrangler d1 migrations apply dong-db --local",
     "test": "node --test tests/*.test.mjs",

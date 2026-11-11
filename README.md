@@ -112,6 +112,64 @@ npm run deploy
 
 خروجی CSV و ورودی CSV دو قالب متفاوت دارند. برای ورود از **فایل نمونهٔ بخش گزارش‌ها** استفاده کنید؛ دادهٔ Splitwise باید ابتدا با این قالب تطبیق داده شود. پشتیبان JSON برای نگهداری/بازبینی است؛ بازیابی یک‌کلیکی آن فعلاً وجود ندارد. نسخهٔ پشتیبان کامل دیتابیس با دستور D1 پایین تهیه می‌شود.
 
+## انتشار با Docker و Coolify
+
+برای اجرای مستقل روی سرور خودتان، این مخزن `Dockerfile` و `docker-compose.yml` دارد. کد Worker دست نمی‌خورد؛ فقط دیتابیس D1 با یک فایل SQLite و سرو فایل‌های ثابت با یک سرور Node جایگزین می‌شوند. فایل‌های اضافه‌شده: `Dockerfile`، `.dockerignore`، `docker-compose.yml` و پوشهٔ `server/` (سرور HTTP، دیتابیس و سرو فایل‌ها).
+
+### روش اول: Build pack از نوع Dockerfile (پیشنهادی)
+
+مراحل بر پایهٔ [مستندات Coolify](https://coolify.io/docs/applications/builds/dockerfile):
+
+۱. در پروژهٔ Coolify روی **+ New** بزنید، **Git repository** را انتخاب و آدرس مخزن را وارد کنید؛ سپس **Check Repository**.
+
+۲. در هنگام ساخت، **Build pack** را روی **Dockerfile** بگذارید (پس از ساخت، این گزینه در `General > Build pipeline > Build strategy` است).
+
+۳. در بخش Build pipeline مقادیر را این‌گونه بگذارید:
+
+- **Base Directory**: `/`
+- **Dockerfile Location**: `/Dockerfile`
+
+۴. در **General** مقدار **Ports Exposes** را `3000` بگذارید. این همان پورت داخلی است که برنامه روی `0.0.0.0:3000` گوش می‌دهد و در `Dockerfile` با `EXPOSE 3000` مشخص شده است.
+
+۵. در بخش **Domains** دامنهٔ خود را با پسوند پورت داخلی اضافه کنید، برای مثال `https://dong.example.com:3000`. پروکسی Coolify هدر `X-Forwarded-Proto` را برای شما می‌فرستد؛ اگر از پروکسی دیگری استفاده می‌کنید، ارسال این هدر لازم است تا کوکی امن (Secure) و بررسی مبدأ درخواست درست کار کند.
+
+۶. در بخش **Storage** یک ذخیره‌سازی پایدار (دیسک یا Docker volume) به مسیر `/data` متصل کنید. دیتابیس در `/data/dong.db` نوشته می‌شود؛ بدون این اتصال، داده‌ها با هر بار استقرار دوباره از بین می‌روند.
+
+۷. در **Environment Variables** این متغیرها را تنظیم کنید:
+
+- `APP_URL`: نشانی عمومی برنامه، مثلاً `https://dong.example.com` — فقط برای لینک‌های ایمیل بازیابی و تأیید به کار می‌رود. خالی بماند ایمیلی ارسال نمی‌شود و برنامه کار می‌کند.
+- `RESEND_API_KEY` و `EMAIL_FROM`: اختیاری؛ برای فعال شدن ارسال ایمیل، پس از خواندن [راهنمای ایمیل و دامنه](SETUP-EMAIL-AND-DOMAIN.md).
+
+۸. **Deploy** بزنید و سلامت‌سنجی را بررسی کنید.
+
+### روش دوم: Build pack از نوع Docker Compose
+
+1. **Build pack** را روی **Docker Compose** بگذارید.
+2. **Base Directory**: `/` و **Docker Compose Location**: `/docker-compose.yml`.
+3. سرویس `dongshar` را در **Domains** به پورت داخلی `3000` متصل کنید، حجم `dong-data` به `/data` متصل می‌شود و متغیرهای محیطی از همان فایل خوانده می‌شوند.
+
+در این روش healthcheck داخل خود فایل تعریف شده و پورت با `expose` باز می‌شود؛ طبق مستندات Coolify، پورتِ `ports` فقط وقتی لازم است که سرویس باید مستقیم روی سرور در دسترس باشد.
+
+### سلامت‌سنجی
+
+برنامه مسیر سبک `GET /api/health` را جواب می‌دهد. داخل `Dockerfile` دستور `HEALTHCHECK` با `curl` آمده است و `curl` داخل تصویر نصب است. اگر در داشبورد Coolify صفحهٔ **Healthcheck** را فعال کردید، چک **HTTP** را با مسیر `/api/health` و پورت `3000` بگذارید (یا چک **CMD** با دستور `curl --fail http://localhost:3000/api/health`). فعال‌کردن healthcheck در داشبورد، دستور داخلی `Dockerfile` را جایگزین می‌کند.
+
+### اجرای محلی با Docker
+
+```sh
+docker build -t dongshar .
+docker run -d --name dongshar -p 3000:3000 -v dong-data:/data dongshar
+```
+
+نشانی: [http://localhost:3000](http://localhost:3000). بدون Docker هم می‌توانید با `npm start` همان سرور را اجرا کنید.
+
+### نکته‌های دیتابیس و پشتیبان
+
+- دیتابیس یک فایل SQLite در `/data/dong.db` (به همراه `dong.db-wal` و `dong.db-shm`) است. مهاجرت‌های `migrations/` هنگام بالا آمدن سرور و فقط برای فایل‌های اجرا نشده اعمال می‌شوند.
+- برای پشتیبان، فایل‌ها را از حجم متصل‌شده بردارید؛ بهتر است هنگام کپی، کانتینر متوقف باشد تا فایل WAL یکپارچه بماند.
+- زمان‌بند روزانه (هزینه‌های تکرارشونده و پاک‌سازی نشست‌ها) داخل کانتینر راس ساعت ۰۳:۰۰ UTC اجرا می‌شود.
+- سرور یک فرایند Node تک‌هسته‌ای است؛ برای گروه‌های کوچک همین کافی است.
+
 ## راه‌اندازی محلی
 
 ```sh
@@ -177,4 +235,4 @@ npx wrangler d1 export dong-db --remote --output=dong-backup.sql
 
 ## ساختار
 
-`public/` رابط و فونت؛ `public/ledger.js` محاسبات مشترک؛ `src/worker.js` API و Cron؛ `src/personal.js` حساب‌های فردی؛ `public/people.js` رابط دوستان؛ `public/theme.js` و `public/themes.css` پوسته‌ها؛ `migrations/` ساختار D1؛ `scripts/deploy.mjs` نصب و انتشار؛ `tests/` تست‌ها. این برنامه هیچ API Key شخص ثالثی نمی‌خواهد. مجوز فونت وزیرمتن در `public/fonts/LICENSE.txt` نگهداری شده است.
+`public/` رابط و فونت؛ `public/ledger.js` محاسبات مشترک؛ `src/worker.js` API و Cron؛ `src/personal.js` حساب‌های فردی؛ `public/people.js` رابط دوستان؛ `public/theme.js` و `public/themes.css` پوسته‌ها؛ `migrations/` ساختار D1؛ `scripts/deploy.mjs` نصب و انتشار؛ `tests/` تست‌ها؛ `server/` سرور مستقل Node برای انتشار با Docker و Coolify؛ `Dockerfile` و `docker-compose.yml` ساختار استقرار. این برنامه هیچ API Key شخص ثالثی نمی‌خواهد. مجوز فونت وزیرمتن در `public/fonts/LICENSE.txt` نگهداری شده است.
